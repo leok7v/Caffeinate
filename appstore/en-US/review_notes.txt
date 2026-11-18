@@ -1,0 +1,9 @@
+Caffeinate is a menu bar app (LSUIElement, no Dock icon). Left-click the cup icon in the menu bar to turn it on or off. Right-click the cup for the menu.
+
+While on, it holds IOKit power assertions (IOPMAssertionCreateWithName), the same ones as the caffeinate(8) command.
+
+The menu item "Prevent sleep with lid closed" is off by default. When the user turns it on and Caffeinate is active, the app calls IOConnectCallScalarMethod on IOPMrootDomain with kPMSetClamshellSleepState, a selector defined in the public SDK header IOKit/pwr_mgt/IOPMLibDefs.h. It uses no private symbols and works inside the App Sandbox. The app clears the setting when the user turns Caffeinate off, quits, or relaunches. The auto-off timer can limit how long the Mac stays awake.
+
+To test the lid option: on battery with no external display, check "Prevent sleep with lid closed", left-click the cup so it fills, close the lid for a minute, and open it. The Mac did not sleep.
+
+The app collects no data and makes no network connections. No account is needed.

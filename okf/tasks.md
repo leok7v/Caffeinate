@@ -23,17 +23,19 @@ compaction loses nothing.
 In the order to work them. Per task a `### #NN subject` heading, then
 a `Status:` paragraph, a `Waits on:` line and a `Next step:` line.
 
-### #2 First signed release
+### #3 Mac App Store submission
 
-Status: `.github/workflows/dmg.yml` is written. The Actions secrets
-are set, 2026-11-18.
+Status: app record 6836422884. Build 26.11.18 is uploaded. The store
+text is in `appstore/en-US/`, the privacy page in `docs/`.
 
-Waits on: nothing.
+Waits on: Human says "submit". The release type MUST stay manual.
 
-Next step: tag vYYMMDD.HHMM, then tag the tap caffeinate-vYYMMDD.HHMM.
+Next step: set free, Data Not Collected, the URLs and the text, attach
+the build, then show the submission to Human.
 
 ## Closed
 
 | # | subject | closed |
 |---|---|---|
 | 1 | Prove the lid option on a closed lid | 2026-11-18 |
+| 2 | First signed release, v261118.1618, in the tap | 2026-11-18 |

@@ -1,0 +1,15 @@
+Caffeinate keeps your Mac awake. Click the cup in the menu bar and your Mac stays awake. Click it again and it may sleep as usual.
+
+Right-click the cup for the options:
+
+- Prevent display sleep
+- Prevent system idle sleep
+- Prevent disk idle sleep
+- Prevent system sleep on AC power
+- Prevent sleep with the lid closed, for a MacBook on battery with no external display (off by default)
+- Auto-off timer: 15 minutes to 8 hours, or any number of minutes
+- Start at login
+
+The first four options match the flags of the built-in caffeinate command. A countdown shows next to the cup while the auto-off timer runs.
+
+Caffeinate collects no data, makes no network connections, and shows no ads. It is free and open source under the MIT license.

@@ -41,9 +41,11 @@ again.
 A closed MacBook in a bag gets hot. Use the option with the auto-off
 timer, and keep the Mac where air can move around it.
 
-The option calls a private IOKit interface of the power manager, the
-one that `pmset` does not expose. If macOS refuses the call, Caffeinate
-shows an alert and turns the option off.
+The option uses only public IOKit calls of the macOS SDK:
+`IOConnectCallScalarMethod` on the power manager with the selector
+`kPMSetClamshellSleepState` from `IOPMLibDefs.h`. The selector has no
+documentation. If macOS refuses the call, Caffeinate shows an alert and
+turns the option off.
 
 ### Auto-off timer
 

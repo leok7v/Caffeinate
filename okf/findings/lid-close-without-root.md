@@ -11,7 +11,9 @@ generated: { by: claude/opus, at: 2026-11-18T08:30:00Z }
 
 `IOServiceOpen` on `IOPMrootDomain`, then
 `IOConnectCallScalarMethod` with selector 12 and input 1 or 0.
-`pmset disablesleep` needs root, and this call does not.
+`pmset disablesleep` needs root, and this call does not. The functions
+are public IOKit, and the SDK header `IOPMLibDefs.h` defines selector
+12 as `kPMSetClamshellSleepState`. No document describes the selector.
 
 - As a user process, not root: open 0x0, call 0x0.
 - As an app bundle with `Caffeinate.entitlements`, signed with an

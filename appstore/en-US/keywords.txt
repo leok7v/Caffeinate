@@ -1,0 +1,1 @@
+awake,sleep,insomnia,keep awake,display,lid,clamshell,menu bar,timer,presentation,no sleep

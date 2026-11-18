@@ -22,3 +22,4 @@ identifier words of the covered sources that no row names.
 | tap | `leok7v/homebrew-tap`, the Homebrew repo that holds the cask | none | `Casks/caffeinate.rb` in the tap |
 | `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` | the Xcode build settings for `CFBundleShortVersionString` and `CFBundleVersion` | none | `project.yml` |
 | `AppleClamshellCausesSleep` | the `IOPMrootDomain` registry property that says if a lid close sleeps the Mac | none | `ioreg -r -k AppleClamshellState` |
+| `IOPMLibDefs.h`, `kPMSetClamshellSleepState` | the public SDK header of the `IOPMrootDomain` user client selectors, and selector 12 in it, the lid option | none | `setLidSleepDisabled` |
