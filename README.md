@@ -91,7 +91,10 @@ drag `Caffeinate.app` to `Applications`.
 
 ### Build it yourself
 
-- With Xcode: `xcodebuild -configuration Release`.
+- With Xcode: `project.yml` is the project, and `xcodegen generate`
+  makes `Caffeinate.xcodeproj` from it. Then build with
+  `xcodebuild -configuration Release`. Install xcodegen with
+  `brew install xcodegen`.
 - With the Command Line Tools only: `./scripts/make-app.sh` compiles
   the sources with `swiftc` and makes an ad-hoc signed `Caffeinate.app`
   in the repo root.

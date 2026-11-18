@@ -1,6 +1,6 @@
 # Package Caffeinate.app as a DMG, and on a v* tag sign, notarize and
 # publish it. The recipe is the one leok7v/ChatOKF and leok7v/kataphasis
-# use, minus xcodegen: this repo commits its Caffeinate.xcodeproj.
+# use: project.yml is the source and xcodegen makes Caffeinate.xcodeproj.
 #
 # The tag IS the version: v261118.0830 builds MARKETING_VERSION 26.11.18
 # and CURRENT_PROJECT_VERSION 261118.0830, both passed on the command
@@ -56,6 +56,11 @@ jobs:
 
       # Tag vYYMMDD.HHMM (UTC): YY.MM.DD is the short version and
       # YYMMDD.HHMM the build, the ChatOKF stamp.
+      - name: Generate the project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
       - name: Version
         run: |
           if [ "$SIGNED" = "true" ]; then

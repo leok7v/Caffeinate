@@ -120,3 +120,5 @@ fastlane/test_output
 iOSInjectionProject/
 tmp/
 __pycache__/
+
+Caffeinate.xcodeproj/

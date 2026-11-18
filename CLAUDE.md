@@ -97,6 +97,7 @@ when the hook does not run.
 
 ## Build
 
+    xcodegen generate          # project.yml -> Caffeinate.xcodeproj
     xcodebuild -project Caffeinate.xcodeproj -scheme Caffeinate \
         -configuration Release -derivedDataPath tmp/dd build
     ./scripts/make-app.sh      # swiftc only, ad-hoc signed, repo root
@@ -108,7 +109,7 @@ no tests.
 ## Layout
 
     Caffeinate/           the app sources, the asset catalog, the entitlements
-    Caffeinate.xcodeproj/ the committed Xcode project, no xcodegen
+    project.yml           the Xcode project source; the .xcodeproj is generated
     scripts/              make-app.sh, release.sh, icon and screenshot makers
     Images/               README images from make-screenshots.swift
     bin/secrets           sets the Actions secrets of dmg.yml

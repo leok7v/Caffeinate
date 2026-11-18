@@ -20,5 +20,5 @@ identifier words of the covered sources that no row names.
 | digest | the SHA-256 of the release DMG, published beside it; the tap reads it into the cask | checksum | `Caffeinate.dmg.sha256` |
 | lid option | the menu item that disables clamshell sleep while Caffeinate is active | closed-display mode | `preventLidSleep`, `setLidSleepDisabled` |
 | tap | `leok7v/homebrew-tap`, the Homebrew repo that holds the cask | none | `Casks/caffeinate.rb` in the tap |
-| `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` | the Xcode build settings for `CFBundleShortVersionString` and `CFBundleVersion` | none | `Caffeinate.xcodeproj/project.pbxproj` |
+| `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` | the Xcode build settings for `CFBundleShortVersionString` and `CFBundleVersion` | none | `project.yml` |
 | `AppleClamshellCausesSleep` | the `IOPMrootDomain` registry property that says if a lid close sleeps the Mac | none | `ioreg -r -k AppleClamshellState` |
