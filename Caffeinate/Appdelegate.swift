@@ -23,6 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var idleItem: NSMenuItem!
     private var diskItem: NSMenuItem!
     private var systemItem: NSMenuItem!
+    private var lidItem: NSMenuItem!
     private var loginItem: NSMenuItem!
 
     // Auto-off timer submenu items whose checkmarks track the config.
@@ -55,10 +56,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusBarItem?.button?.target = self
         statusBarItem?.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         updateStatusButton()
+        _ = setLidSleepDisabled(false)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        _ = setLidSleepDisabled(false)
     }
 
     @objc private func statusItemClicked(_ sender: Any?) {
-        if NSApp.currentEvent?.type == .rightMouseUp {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             // Temporarily attach the menu so the status item pops it up, then
             // detach so the next left-click fires the action again.
             statusBarItem?.menu = menu
@@ -92,6 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         idleItem = addFlagItem(to: menu, title: "Prevent system idle sleep", action: #selector(toggleIdle))
         diskItem = addFlagItem(to: menu, title: "Prevent disk idle sleep", action: #selector(toggleDisk))
         systemItem = addFlagItem(to: menu, title: "Prevent system sleep (on AC power)", action: #selector(toggleSystem))
+        lidItem = addFlagItem(to: menu, title: "Prevent sleep with lid closed", action: #selector(toggleLid))
 
         menu.addItem(.separator())
 
@@ -174,6 +182,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         idleItem.state = conf.preventIdleSleep ? .on : .off
         diskItem.state = conf.preventDiskIdle ? .on : .off
         systemItem.state = conf.preventSystemSleep ? .on : .off
+        lidItem.state = conf.preventLidSleep ? .on : .off
         loginItem.state = conf.atLogin ? .on : .off
         loginItem.isEnabled = configHandler.macOS13
 
@@ -206,6 +215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             hasCoffee = false
             stopAutoOff()
         }
+        syncLidSleep()
         updateStatusButton()
     }
 
@@ -214,6 +224,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleIdle()    { flip { $0.preventIdleSleep.toggle() } }
     @objc private func toggleDisk()    { flip { $0.preventDiskIdle.toggle() } }
     @objc private func toggleSystem()  { flip { $0.preventSystemSleep.toggle() } }
+    @objc private func toggleLid()     { flip { $0.preventLidSleep.toggle() } }
 
     private func flip(_ change: (ConfigData) -> Void) {
         configHandler.mutateConfig(change)
@@ -222,6 +233,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // selected anymore, we end up inactive.
             hasCoffee = createAssertions(reason: "Caffeinate")
             if !hasCoffee { stopAutoOff() }
+            syncLidSleep()
             updateStatusButton()
         }
     }
@@ -269,7 +281,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let minutes = Int(field.stringValue), minutes > 0 else { return }
         configHandler.mutateConfig {
             $0.timerEnabled = true
-            $0.timerDuration = TimeInterval(minutes * 60)
+            $0.timerDuration = TimeInterval(min(minutes, 525_600)) * 60
         }
         if hasCoffee { startAutoOffIfNeeded() }
         updateStatusButton()
@@ -332,16 +344,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .ok, .unsupported:
             break
         case .requiresApproval:
-            showLoginAlert("Caffeinate needs your approval to start at login. Enable it under System Settings → General → Login Items.")
+            showAlert("Start at Login", "Caffeinate needs your approval to start at login. Enable it under System Settings → General → Login Items.")
         case .failed(let error):
-            showLoginAlert("Couldn't update the login item: \(error.localizedDescription)")
+            showAlert("Start at Login", "Couldn't update the login item: \(error.localizedDescription)")
         }
     }
 
-    private func showLoginAlert(_ message: String) {
+    private func showAlert(_ title: String, _ message: String) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Start at Login"
+        alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.runModal()
@@ -411,5 +423,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         activeAssertions.removeAll()
         return true
+    }
+
+    private func setLidSleepDisabled(_ disabled: Bool) -> kern_return_t {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                  IOServiceMatching("IOPMrootDomain"))
+        var connect: io_connect_t = 0
+        var result = IOServiceOpen(service, mach_task_self_, 0, &connect)
+        if result == KERN_SUCCESS {
+            var input: [UInt64] = [disabled ? 1 : 0]
+            var outputCount: UInt32 = 0
+            result = IOConnectCallScalarMethod(connect, UInt32(kPMSetClamshellSleepState),
+                                               &input, 1, nil, &outputCount)
+            IOServiceClose(connect)
+        }
+        IOObjectRelease(service)
+        return result
+    }
+
+    private func syncLidSleep() {
+        let disable = hasCoffee && configHandler.conf.preventLidSleep
+        let result = setLidSleepDisabled(disable)
+        if disable && result != KERN_SUCCESS {
+            configHandler.mutateConfig { $0.preventLidSleep = false }
+            showAlert("Prevent Sleep with Lid Closed",
+                      String(format: "macOS refused the request (0x%x).", result))
+        }
     }
 }

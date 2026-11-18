@@ -1,0 +1,304 @@
+# Package Caffeinate.app as a DMG, and on a v* tag sign, notarize and
+# publish it. The recipe is the one leok7v/ChatOKF and leok7v/kataphasis
+# use, minus xcodegen: this repo commits its Caffeinate.xcodeproj.
+#
+# The tag IS the version: v261118.0830 builds MARKETING_VERSION 26.11.18
+# and CURRENT_PROJECT_VERSION 261118.0830, both passed on the command
+# line, so there is nothing to bump before tagging. Tag with
+#   t=v$(date -u +%y%m%d.%H%M); git tag $t && git push origin $t
+#
+# The signed path needs five repository secrets, set by bin/secrets:
+#   MACOS_CERTIFICATE       Developer ID Application .p12, base64 encoded
+#   MACOS_CERTIFICATE_PWD   the .p12 export password
+#   KEYCHAIN_PASSWORD       any string; scopes the throwaway CI keychain
+#   APPLE_ID                the Apple ID that owns the notary submission
+#   APPLE_ID_PWD            an app-specific password, NOT the account one
+# The team is read off the imported certificate, so signing and
+# notarising cannot disagree.
+#
+# BOTH the app and the DMG are notarized and stapled, app first, so the
+# ticket travels with the app once it leaves the DMG.
+#
+# After the release exists, tag leok7v/homebrew-tap caffeinate-v<version>
+# and its cask.yml writes the version and the digest into the cask.
+
+name: macOS DMG
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: dmg-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    runs-on: macos-26
+    permissions:
+      contents: write
+
+    env:
+      SIGNED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --show-sdk-version --sdk macosx
+          sw_vers
+
+      # Tag vYYMMDD.HHMM (UTC): YY.MM.DD is the short version and
+      # YYMMDD.HHMM the build, the ChatOKF stamp.
+      - name: Version
+        run: |
+          if [ "$SIGNED" = "true" ]; then
+            build="${GITHUB_REF_NAME#v}"
+          else
+            build="$(date -u +%y%m%d.%H%M)"
+          fi
+          if ! printf '%s' "$build" | grep -Eq '^[0-9]{6}\.[0-9]{4}$'; then
+            echo "FAIL: tag $GITHUB_REF_NAME is not vYYMMDD.HHMM"
+            exit 1
+          fi
+          d="${build%.*}"
+          v="${d:0:2}.${d:2:2}.${d:4:2}"
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "BUILD=$build" >> "$GITHUB_ENV"
+          echo "version $v build $build"
+
+      - name: Import signing certificate
+        if: env.SIGNED == 'true'
+        env:
+          CERT_B64: ${{ secrets.MACOS_CERTIFICATE }}
+          CERT_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$CERT_B64" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p "$KEYCHAIN_PWD" build.keychain
+          security default-keychain -s build.keychain
+          # xcodebuild searches the keychain LIST, not the default one.
+          security list-keychains -d user -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PWD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security import /tmp/cert.p12 -k build.keychain \
+            -P "$CERT_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PWD" build.keychain
+          rm /tmp/cert.p12
+          security find-identity -v -p codesigning
+          team=$(security find-identity -v -p codesigning |
+                 sed -n 's/.*"Developer ID Application: .*(\(.*\))".*/\1/p' |
+                 head -1)
+          if [ -z "$team" ]; then
+            echo "FAIL: no Developer ID Application identity was imported"
+            exit 1
+          fi
+          echo "SIGN_TEAM=$team" >> "$GITHUB_ENV"
+
+      # A 401 here costs seconds; after the build it costs minutes.
+      - name: Notary credentials
+        if: env.SIGNED == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.APPLE_ID_PWD }}
+        run: |
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PWD" \
+            --team-id "$SIGN_TEAM" \
+            --output-format json > /dev/null
+          echo "the notary service accepted these credentials"
+
+      - name: Build (Release, unsigned)
+        if: env.SIGNED != 'true'
+        run: |
+          xcodebuild -project Caffeinate.xcodeproj -scheme Caffeinate \
+            -destination 'generic/platform=macOS' \
+            -configuration Release \
+            -derivedDataPath DerivedData \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          echo "APP=DerivedData/Build/Products/Release/Caffeinate.app" \
+            >> "$GITHUB_ENV"
+
+      # Archive and export is the path Apple documents for Developer ID,
+      # and the export strips get-task-allow, which notarization refuses.
+      - name: Build (Release, signed)
+        if: env.SIGNED == 'true'
+        run: |
+          xcodebuild archive \
+            -project Caffeinate.xcodeproj -scheme Caffeinate \
+            -destination 'generic/platform=macOS' \
+            -configuration Release \
+            -archivePath build/Caffeinate.xcarchive \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$SIGN_TEAM" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ENABLE_HARDENED_RUNTIME=YES \
+            OTHER_CODE_SIGN_FLAGS="--timestamp"
+          cat > /tmp/export.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>developer-id</string>
+            <key>teamID</key><string>$SIGN_TEAM</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key>
+            <string>Developer ID Application</string>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/Caffeinate.xcarchive \
+            -exportOptionsPlist /tmp/export.plist \
+            -exportPath export
+          echo "APP=export/Caffeinate.app" >> "$GITHUB_ENV"
+
+      - name: Universal binary and version
+        run: |
+          bin="$APP/Contents/MacOS/Caffeinate"
+          archs=$(lipo -archs "$bin")
+          echo "architectures: $archs"
+          case "$archs" in
+            *arm64*x86_64*|*x86_64*arm64*) : ;;
+            *) echo "FAIL: not a universal binary"; exit 1 ;;
+          esac
+          plist="$APP/Contents/Info.plist"
+          got=$(/usr/libexec/PlistBuddy \
+                -c 'Print CFBundleShortVersionString' "$plist")/$(
+                /usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$plist")
+          if [ "$got" != "$VERSION/$BUILD" ]; then
+            echo "FAIL: the app says $got, the tag says $VERSION/$BUILD"
+            exit 1
+          fi
+
+      - name: No debug entitlement survived the build
+        if: env.SIGNED == 'true'
+        run: |
+          ents=$(codesign -d --entitlements :- "$APP" 2>/dev/null)
+          echo "$ents"
+          if printf '%s' "$ents" | grep -q "get-task-allow"; then
+            echo "FAIL: the signed app still requests get-task-allow"
+            exit 1
+          fi
+
+      - name: Notary helper
+        if: env.SIGNED == 'true'
+        run: |
+          cat > /tmp/notarize.sh <<'SH'
+          set -eu -o pipefail
+          target=$1
+          submission=$(mktemp)
+          xcrun notarytool submit "$target" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PWD" \
+            --team-id "$SIGN_TEAM" \
+            --wait \
+            --output-format json | tee "$submission"
+          id=$(python3 -c "import json;print(json.load(open('$submission'))['id'])")
+          status=$(python3 -c "import json;print(json.load(open('$submission'))['status'])")
+          echo "Notarization status for $target: $status"
+          if [ "$status" != "Accepted" ]; then
+            echo "::group::Apple notary log for $id"
+            xcrun notarytool log "$id" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_ID_PWD" \
+              --team-id "$SIGN_TEAM"
+            echo "::endgroup::"
+            exit 1
+          fi
+          SH
+          chmod +x /tmp/notarize.sh
+
+      - name: Notarize and staple the app
+        if: env.SIGNED == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.APPLE_ID_PWD }}
+        run: |
+          ditto -c -k --keepParent "$APP" /tmp/Caffeinate.zip
+          sh /tmp/notarize.sh /tmp/Caffeinate.zip
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+
+      - name: Stage app for DMG
+        run: |
+          mkdir -p dmg-staging
+          cp -R "$APP" dmg-staging/Caffeinate.app
+          ln -s /Applications dmg-staging/Applications
+          cp LICENSE dmg-staging/LICENSE
+
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "Caffeinate" \
+            -srcfolder dmg-staging \
+            -ov \
+            -format UDZO \
+            -fs HFS+ \
+            Caffeinate.dmg
+
+      - name: Sign DMG
+        if: env.SIGNED == 'true'
+        run: |
+          codesign --force --sign "Developer ID Application" \
+            --timestamp --options runtime \
+            Caffeinate.dmg
+          codesign -dv --verbose=2 Caffeinate.dmg || true
+
+      - name: Notarize and staple the DMG
+        if: env.SIGNED == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.APPLE_ID_PWD }}
+        run: |
+          sh /tmp/notarize.sh Caffeinate.dmg
+          xcrun stapler staple Caffeinate.dmg
+          xcrun stapler validate Caffeinate.dmg
+
+      # Expect: accepted, source=Notarized Developer ID.
+      - name: Gatekeeper verdict
+        if: env.SIGNED == 'true'
+        run: |
+          hdiutil attach Caffeinate.dmg -nobrowse -mountpoint /tmp/dmg
+          spctl -a -t exec -vv /tmp/dmg/Caffeinate.app
+          hdiutil detach /tmp/dmg
+
+      # leok7v/homebrew-tap reads this file to write the cask's sha256.
+      - name: DMG digest
+        run: shasum -a 256 Caffeinate.dmg | tee Caffeinate.dmg.sha256
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Caffeinate.dmg
+          path: |
+            Caffeinate.dmg
+            Caffeinate.dmg.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release on tag
+        if: env.SIGNED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Caffeinate $BUILD" \
+            --generate-notes \
+            Caffeinate.dmg Caffeinate.dmg.sha256

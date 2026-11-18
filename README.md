@@ -1,14 +1,26 @@
 # Caffeinate
-A macOS menubar app to temporarily prevent the Mac from sleeping.
 
-## How does it work
-Left-clicking the cup toggles Caffeinate. If the cup is filled, your Mac won't go to sleep anymore.
-Right-clicking the cup opens a menu where you can choose which kinds of sleep to prevent, toggle **Start at login**, and quit the app.
+A macOS menu bar app that keeps the Mac awake for as long as you want.
+
+This repo is `leok7v/Caffeinate`, a fork of
+[LennardKittner/Caffeinate](https://github.com/LennardKittner/Caffeinate).
+The fork adds a signed and notarized DMG, a Homebrew cask, and an
+option that keeps the Mac awake with the lid closed.
+
+## How it works
+
+A left click on the cup turns Caffeinate on or off. When the cup is
+full, the Mac does not go to sleep. A right click, or a Control click,
+opens the menu. In the menu you pick the kinds of sleep to prevent, set
+**Start at login**, and quit the app.
 
 ![The right-click menu](./Images/menu.png)
 
 ### Keep awake options
-These mirror the flags of the built-in `caffeinate(8)` command-line tool and can be toggled independently. The defaults match `caffeinate -dims`:
+
+The first four options are the flags of the `caffeinate(8)` command
+line tool. Each one turns on or off by itself. The defaults are the
+same as `caffeinate -dims`.
 
 | Menu item | `caffeinate` flag |
 |-----------|-------------------|
@@ -16,9 +28,32 @@ These mirror the flags of the built-in `caffeinate(8)` command-line tool and can
 | Prevent system idle sleep | `-i` |
 | Prevent disk idle sleep | `-m` |
 | Prevent system sleep (on AC power) | `-s` |
+| Prevent sleep with lid closed | none, off by default |
+
+### Lid closed
+
+**Prevent sleep with lid closed** keeps a MacBook awake when you close
+the lid, on battery and with no external display. The option needs no
+`sudo` and no helper. The option applies only while Caffeinate is active, and
+Caffeinate clears it when you turn Caffeinate off, quit, or launch it
+again.
+
+A closed MacBook in a bag gets hot. Use the option with the auto-off
+timer, and keep the Mac where air can move around it.
+
+The option calls a private IOKit interface of the power manager, the
+one that `pmset` does not expose. If macOS refuses the call, Caffeinate
+shows an alert and turns the option off.
 
 ### Auto-off timer
-Optionally have Caffeinate turn itself off after a set time. Under **Auto-off after…** in the right-click menu, pick a preset (15 minutes up to 8 hours) or **Custom…** to enter your own duration in minutes; choose **Off** to disable it. When enabled, activating Caffeinate starts a countdown that appears next to the cup in the menu bar (and in the **Active** row of the menu), and Caffeinate deactivates automatically when it reaches zero.
+
+Caffeinate can turn itself off after a set time. In the menu, open
+**Auto-off after...** and pick a preset from 15 minutes to 8 hours. Or
+pick **Custom...** and type a number of minutes, at most one year. Pick
+**Off** to stop the timer.
+
+With the timer on, a countdown shows next to the cup and in the
+**Active** row of the menu. At zero, Caffeinate turns itself off.
 
 ![cup1](./Images/cup1.png) dark mode Caffeinate active
 ![cup2](./Images/cup2.png) dark mode Caffeinate inactive
@@ -26,68 +61,74 @@ Optionally have Caffeinate turn itself off after a set time. Under **Auto-off af
 ![cup3](./Images/cup3.png) light mode Caffeinate active
 ![cup4](./Images/cup4.png) light mode Caffeinate inactive
 
-
 ## Requirements
-The app requires macOS 11 or later to run. The **Start at login** option (in the right-click menu) requires macOS 13 or later.
+
+macOS 13 or later, Apple Silicon or Intel. The app is a universal
+binary.
 
 ## Installation
 
-### Download a release
-Download `Caffeinate.app.zip` from [releases](https://github.com/LennardKittner/Caffeinate/releases), unzip it, and move `Caffeinate.app` to `/Applications` (or `~/Applications`).
+The release DMG is signed with a Developer ID certificate, notarized
+and stapled. Gatekeeper accepts the app with no prompt and no `xattr`
+step.
 
-The released build is ad-hoc signed (no Developer ID / notarization), so on first launch you may need to right-click the app → **Open**. If Gatekeeper blocks it, clear the quarantine flag:
+### Homebrew
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/Caffeinate.app
+brew tap leok7v/tap
+brew trust leok7v/tap
+brew install --cask leok7v/tap/caffeinate
 ```
 
-### Install with chezmoi
-Add an entry to your `.chezmoiexternal.toml` to pull the app straight from the release. This installs to `~/Applications`, which Finder treats as a real Applications folder:
+`brew upgrade` moves you to a newer release. The tap is
+[leok7v/homebrew-tap](https://github.com/leok7v/homebrew-tap).
 
-```toml
-["Applications/Caffeinate.app"]
-    type = "archive"
-    url = "https://github.com/LennardKittner/Caffeinate/releases/download/v1.2.0/Caffeinate.app.zip"
-    stripComponents = 1
-    exact = true
-    refreshPeriod = "168h"
-```
+### Download a release
 
-`stripComponents = 1` drops the leading `Caffeinate.app/` in the archive so its `Contents/` lands directly in the target directory. chezmoi's downloader does not set `com.apple.quarantine`, so the ad-hoc-signed app launches without the Gatekeeper prompt. Bump the `url` tag whenever you cut a new release.
+Download `Caffeinate.dmg` from
+[releases](https://github.com/leok7v/Caffeinate/releases), open it, and
+drag `Caffeinate.app` to `Applications`.
 
 ### Build it yourself
-- **With Xcode:** `xcodebuild -configuration Release`
-- **Without full Xcode** (Command Line Tools only): `./scripts/make-app.sh` compiles the sources with `swiftc`, builds `AppIcon.icns` from the asset catalog, and assembles `Caffeinate.app` in the repo root.
 
-## Building and releasing
-The icon PNGs are committed under `Caffeinate/Assets.xcassets/AppIcon.appiconset/`. To regenerate them from the `cup.and.saucer` SF Symbol, run `swift scripts/make-icon.swift Caffeinate/Assets.xcassets/AppIcon.appiconset`. The README images (`Images/`) are likewise generated by `swift scripts/make-screenshots.swift Images`.
+- With Xcode: `xcodebuild -configuration Release`.
+- With the Command Line Tools only: `./scripts/make-app.sh` compiles
+  the sources with `swiftc` and makes an ad-hoc signed `Caffeinate.app`
+  in the repo root.
 
-To cut a release (matching the `Caffeinate.app.zip` asset the upstream repo ships):
+## Release
 
-1. Bump the version in `scripts/make-app.sh` (`CFBundleShortVersionString`) and `Caffeinate.xcodeproj/project.pbxproj` (`MARKETING_VERSION`).
-2. Build the release archive:
+A release is a tag. `.github/workflows/dmg.yml` builds the universal
+app and signs it with Developer ID. Then it notarizes and staples the
+app and the DMG. Then it publishes `Caffeinate.dmg` and
+`Caffeinate.dmg.sha256` as a GitHub release. The tag is the UTC time,
+vYYMMDD.HHMM. Tag v261118.0830 builds version 26.11.18, build
+261118.0830.
 
-   ```sh
-   ./scripts/release.sh   # builds Caffeinate.app and Caffeinate.app.zip
-   ```
+1. Set the five Actions secrets once per repo, in a Terminal window:
+   `bin/secrets tmp/DeveloperID.p12`.
+2. Tag and push:
+   `t=v$(date -u +%y%m%d.%H%M); git tag $t && git push origin $t`.
+3. When the release exists, tag `leok7v/homebrew-tap` with the same
+   stamp to update the cask:
 
-3. Publish it, then update the tag referenced by chezmoi:
+       git tag caffeinate-$t && git push origin caffeinate-$t
 
-   ```sh
-   gh release create vX.Y.Z Caffeinate.app.zip --title "Version X.Y.Z" --notes "..."
-   ```
+A manual run of the workflow builds an unsigned DMG as an artifact and
+publishes nothing.
 
-`scripts/release.sh` packages the bundle with `zip -X -y` so the archive extracts cleanly with any unzipper (including chezmoi's), without stray AppleDouble `._*` files, while preserving the ad-hoc code signature.
+`swift scripts/make-icon.swift Caffeinate/Assets.xcassets/AppIcon.appiconset`
+makes the icon PNGs from the `cup.and.saucer` SF Symbol.
+`swift scripts/make-screenshots.swift Images` makes the README images.
 
 ## FAQ
+
 **How do I quit?**
 
-Right-click the menu bar item and choose **Quit Caffeinate**.
-
-## TODO
-Even if the lid is closed, prevent the Mac from sleeping. This probably requires root privelages.
+Right-click the cup and choose **Quit Caffeinate**.
 
 ## Links
+
 [CPUMonitor menu bar app](https://github.com/LennardKittner/CPUMonitor)
 
 [ClipBoardManager menu bar app](https://github.com/LennardKittner/ClipBoardManager)

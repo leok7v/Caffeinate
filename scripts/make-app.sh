@@ -9,6 +9,8 @@ cd "$(dirname "$0")/.."
 SDK="$(xcrun --show-sdk-path)"
 BUILD=".build"
 APP="Caffeinate.app"
+MARKETING="$(date -u +%y.%m.%d)"
+BUILD_VERSION="$(date -u +%y%m%d.%H%M)"
 
 mkdir -p "$BUILD"
 SOURCES=(
@@ -49,20 +51,20 @@ cp "$ICONSRC/icon_512.png"  "$ICONSET/icon_512x512.png"
 cp "$ICONSRC/icon_1024.png" "$ICONSET/icon_512x512@2x.png"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key><string>Caffeinate</string>
-    <key>CFBundleIdentifier</key><string>com.Lennard.Caffeinate</string>
+    <key>CFBundleIdentifier</key><string>io.github.leok7v.Caffeinate</string>
     <key>CFBundleName</key><string>Caffeinate</string>
     <key>CFBundleDisplayName</key><string>Caffeinate</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIconName</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.2.0</string>
-    <key>CFBundleVersion</key><string>3</string>
+    <key>CFBundleShortVersionString</key><string>${MARKETING}</string>
+    <key>CFBundleVersion</key><string>${BUILD_VERSION}</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>

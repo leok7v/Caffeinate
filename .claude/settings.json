@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .soul/session_start.py 2>/dev/null || python .soul/session_start.py"
+          }
+        ]
+      }
+    ]
+  }
+}

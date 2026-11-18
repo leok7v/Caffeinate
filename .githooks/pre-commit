@@ -1,0 +1,34 @@
+#!/bin/sh
+# The gates in .soul/ run before every commit: the bundle lint, the
+# staged comment lint and the staged prose lints. In the origin SOUL.md
+# and SOUL-INSTALL.md must match the bundle, and a gloss index must be
+# current. Then okf/log.md is caught up with HEAD: the previous commit's
+# date and subject are appended and staged, so the log rides one commit
+# behind and the tree is clean after every commit. A log that git
+# ignores, the local install, is appended and not staged. Installed per
+# clone with `git config core.hooksPath .githooks`.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+P=python3
+command -v python3 >/dev/null 2>&1 || P=python
+command -v "$P" >/dev/null 2>&1 || P="py -3"
+if [ ! -f .soul/okf_lint.py ]; then
+    echo "pre-commit: .soul/ is missing; follow SOUL-INSTALL.md" >&2
+    exit 1
+fi
+$P .soul/okf_lint.py --root . &&
+$P .soul/comment_lint.py --root . --staged &&
+$P .soul/ste_lint.py --root . --staged &&
+$P .soul/term_lint.py --root . --staged || exit 1
+if [ -f template/SOUL.md ]; then
+    $P .soul/soul.py --root . --check || exit 1
+fi
+if [ -f okf/gloss/index.tsv ] && [ -f .soul/gloss/gloss_index.py ]; then
+    $P .soul/gloss/gloss_index.py --root . --check || exit 1
+fi
+if [ -f okf/log.md ] && git rev-parse -q --verify HEAD >/dev/null; then
+    line=$(git log -1 --format='%ad  %s' --date=short)
+    if ! grep -qxF "$line" okf/log.md; then
+        printf '%s\n' "$line" >> okf/log.md || exit 1
+        git check-ignore -q okf/log.md || git add okf/log.md
+    fi
+fi
