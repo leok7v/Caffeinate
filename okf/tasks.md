@@ -37,13 +37,14 @@ the build, then show the submission to Human.
 
 Status: the lid option applies only on AC power and locks the `-s`
 item on. The lid test passed on 2026-11-23, arms A to D, per
-`okf/findings/lid-close-without-root.md`. The code is in `main`, not
-committed, and in the PR branch in `tmp/pr7`, not pushed.
+`okf/findings/lid-close-without-root.md`. The code is in `main` at
+1988cab. The PR branch is pushed at b8fbad8, with a new description
+and a reply in each of the 2 open threads, on 2026-11-23.
 
-Waits on: Human says "push".
+Waits on: the owner reviews PR 7 again.
 
-Next step: push the PR branch, update the description with the test,
-and reply in the 2 open threads.
+Next step: read the owner's answer. If the owner wants the option on
+battery too, remove the AC rule in the PR branch only.
 
 ## Closed
 
