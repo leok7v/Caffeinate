@@ -8,6 +8,7 @@
 import Foundation
 import AppKit
 import IOKit.pwr_mgt
+import IOKit.ps
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var statusBarItem: NSStatusItem?
@@ -37,6 +38,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var expiryDate: Date?
     private var tickTimer: Timer?
 
+    private var lidSleepDisabled = false
+
     // Duration presets shown in the "Auto-off after…" submenu.
     private static let timerPresets: [(title: String, seconds: TimeInterval)] = [
         ("15 minutes", 15 * 60),
@@ -58,6 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateStatusButton()
         // Clear a lid-sleep override left behind by a previous run that crashed.
         _ = setLidSleepDisabled(false)
+        observePowerSource()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -100,7 +104,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         idleItem = addFlagItem(to: menu, title: "Prevent system idle sleep", action: #selector(toggleIdle))
         diskItem = addFlagItem(to: menu, title: "Prevent disk idle sleep", action: #selector(toggleDisk))
         systemItem = addFlagItem(to: menu, title: "Prevent system sleep (on AC power)", action: #selector(toggleSystem))
-        lidItem = addFlagItem(to: menu, title: "Prevent sleep with lid closed", action: #selector(toggleLid))
+        lidItem = addFlagItem(to: menu, title: "Prevent sleep with lid closed (on AC power)", action: #selector(toggleLid))
 
         menu.addItem(.separator())
 
@@ -182,7 +186,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         displayItem.state = conf.preventDisplaySleep ? .on : .off
         idleItem.state = conf.preventIdleSleep ? .on : .off
         diskItem.state = conf.preventDiskIdle ? .on : .off
-        systemItem.state = conf.preventSystemSleep ? .on : .off
+        systemItem.state = (conf.preventSystemSleep || conf.preventLidSleep) ? .on : .off
+        systemItem.isEnabled = !conf.preventLidSleep
+        systemItem.toolTip = conf.preventLidSleep ?
+            "Required by \u{201C}Prevent sleep with lid closed\u{201D}. Without it, the idle sleep timer still puts a closed Mac to sleep." : nil
         lidItem.state = conf.preventLidSleep ? .on : .off
         loginItem.state = conf.atLogin ? .on : .off
         loginItem.isEnabled = configHandler.macOS13
@@ -391,10 +398,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func selectedAssertionTypes() -> [String] {
         let conf = configHandler.conf
         var types: [String] = []
+        let systemSleep = conf.preventSystemSleep || conf.preventLidSleep
         if conf.preventDisplaySleep { types.append(kIOPMAssertionTypePreventUserIdleDisplaySleep as String) } // -d
         if conf.preventIdleSleep { types.append(kIOPMAssertionTypePreventUserIdleSystemSleep as String) }     // -i
         if conf.preventDiskIdle { types.append(kIOPMAssertPreventDiskIdle as String) }                        // -m
-        if conf.preventSystemSleep { types.append(kIOPMAssertionTypePreventSystemSleep as String) }           // -s
+        if systemSleep { types.append(kIOPMAssertionTypePreventSystemSleep as String) }                       // -s
         return types
     }
 
@@ -448,15 +456,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return result
     }
 
-    // Lid-closed sleep is disabled only while Caffeinate is active and the
-    // option is checked. If macOS refuses, the option is turned off.
+    // Lid-closed sleep is disabled only while Caffeinate is active, the
+    // option is checked and the Mac is on AC power.
     private func syncLidSleep() {
-        let disable = hasCoffee && configHandler.conf.preventLidSleep
-        let result = setLidSleepDisabled(disable)
-        if disable && result != KERN_SUCCESS {
-            configHandler.mutateConfig { $0.preventLidSleep = false }
-            showAlert("Prevent Sleep with Lid Closed",
-                      String(format: "macOS refused the request (0x%x).", result))
+        let disable = hasCoffee && configHandler.conf.preventLidSleep && onACPower()
+        if disable != lidSleepDisabled {
+            let result = setLidSleepDisabled(disable)
+            if result == KERN_SUCCESS {
+                lidSleepDisabled = disable
+            } else if disable {
+                configHandler.mutateConfig { $0.preventLidSleep = false }
+                showAlert("Prevent Sleep with Lid Closed",
+                          String(format: "macOS refused to keep the Mac awake with the lid closed (0x%x). The option is turned off.", result))
+            } else {
+                showAlert("Prevent Sleep with Lid Closed",
+                          String(format: "macOS refused to restore sleep with the lid closed (0x%x). The Mac may stay awake with the lid closed until Caffeinate retries, quits, or the Mac restarts.", result))
+            }
         }
+    }
+
+    private func onACPower() -> Bool {
+        let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()
+        let type = IOPSGetProvidingPowerSourceType(snapshot).takeUnretainedValue() as String
+        return type == kIOPMACPowerKey
+    }
+
+    private func observePowerSource() {
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        let source = IOPSNotificationCreateRunLoopSource({ context in
+            if let context = context {
+                Unmanaged<AppDelegate>.fromOpaque(context).takeUnretainedValue().syncLidSleep()
+            }
+        }, context).takeRetainedValue()
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
     }
 }
