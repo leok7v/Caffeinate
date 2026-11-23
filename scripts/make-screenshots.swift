@@ -68,7 +68,7 @@ let rows: [Row] = [
     .check("Prevent system idle sleep", on: true, indent: true),
     .check("Prevent disk idle sleep", on: true, indent: true),
     .check("Prevent system sleep (on AC power)", on: true, indent: true),
-    .check("Prevent sleep with lid closed", on: false, indent: true),
+    .check("Prevent sleep with lid closed (on AC power)", on: false, indent: true),
     .sep,
     .plain("Start at login"),
     .sep,

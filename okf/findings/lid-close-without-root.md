@@ -36,3 +36,29 @@ closed at about 08:15:20 PST, and powerd wrote `lidopen` at 08:17:59.
 `pmset -g log` has no Sleep line and no Wake line in that window, and
 other assertion events went on at 08:16:53, 08:17:12 and 08:17:21.
 The test is one run with no control arm.
+
+Lid test of the AC-only option, 2026-11-23, same Mac, macOS 26.7.1,
+battery at 100 percent, no external display. The build is `main` with
+the AC-only change. Caffeinate held `-i` and `-m` in each arm, and the
+lid option added `-s`. Evidence is `pmset -g log` and a clock line
+every 5 s.
+
+- A, AC, option off: `Clamshell Sleep` at 00:58:59, about 10 s after
+  the lid closed. This arm is the control.
+- B, AC, option on: lid closed 01:02:26 to 01:04:22, no gap in the
+  clock, no sleep entry.
+- C, battery, option on, the app launched on battery: `Clamshell
+  Sleep` at 01:08:08, about 5 s after the lid closed.
+- D, option on: plugged in, lid closed at 01:10:08, awake on AC.
+  Unplugged at 01:10:43 with the lid closed, `Clamshell Sleep` in the
+  same second. The power source notification works in the sandbox in
+  both directions.
+
+`AppleClamshellCausesSleep` is not a proof of the override state. On
+battery it read `0` after the selector set 0, then 1, then 0, each
+call `KERN_SUCCESS`. Use a lid close and `pmset -g log` instead.
+
+A MacBookAir5,2 on macOS 15.8.3 through OpenCore is no test machine.
+With Caffeinate quit, it did not sleep with the lid closed. The
+internal keyboard and trackpad sent a user activity event within 1 s of each
+display off, every 22 s. The cause is not known.

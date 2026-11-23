@@ -6,7 +6,7 @@ Right-click the cup for the options:
 - Prevent system idle sleep
 - Prevent disk idle sleep
 - Prevent system sleep on AC power
-- Prevent sleep with the lid closed, for a MacBook on battery with no external display (off by default)
+- Prevent sleep with the lid closed, for a MacBook on AC power with no external display (off by default)
 - Auto-off timer: 15 minutes to 8 hours, or any number of minutes
 - Start at login
 

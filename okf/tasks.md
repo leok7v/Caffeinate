@@ -33,6 +33,18 @@ Waits on: Human says "submit". The release type MUST stay manual.
 Next step: set free, Data Not Collected, the URLs and the text, attach
 the build, then show the submission to Human.
 
+### #4 Lid test of the AC-only lid option, then PR 7
+
+Status: the lid option applies only on AC power and locks the `-s`
+item on. The lid test passed on 2026-11-23, arms A to D, per
+`okf/findings/lid-close-without-root.md`. The code is in `main`, not
+committed, and in the PR branch in `tmp/pr7`, not pushed.
+
+Waits on: Human says "push".
+
+Next step: push the PR branch, update the description with the test,
+and reply in the 2 open threads.
+
 ## Closed
 
 | # | subject | closed |

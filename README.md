@@ -28,24 +28,29 @@ same as `caffeinate -dims`.
 | Prevent system idle sleep | `-i` |
 | Prevent disk idle sleep | `-m` |
 | Prevent system sleep (on AC power) | `-s` |
-| Prevent sleep with lid closed | none, off by default |
+| Prevent sleep with lid closed (on AC power) | none, off by default |
 
 ### Lid closed
 
-**Prevent sleep with lid closed** keeps a MacBook awake when you close
-the lid, on battery and with no external display. The option needs no
-`sudo` and no helper. The option applies only while Caffeinate is active, and
-Caffeinate clears it when you turn Caffeinate off, quit, or launch it
-again.
+**Prevent sleep with lid closed (on AC power)** keeps a MacBook awake
+when you close the lid, with no external display. The option needs no
+`sudo` and no helper. The option applies only while Caffeinate is
+active and the Mac is on AC power. Caffeinate clears it when you turn
+Caffeinate off, unplug the power, quit, or launch it again.
 
-A closed MacBook in a bag gets hot. Use the option with the auto-off
-timer, and keep the Mac where air can move around it.
+On battery the option has no effect, so a closed MacBook in a bag
+sleeps as usual and does not get hot.
+
+The lid override stops only the sleep that the lid causes. The idle
+sleep timer still applies, so the option also turns on **Prevent
+system sleep (on AC power)** and locks it on while checked.
 
 The option uses only public IOKit calls of the macOS SDK:
 `IOConnectCallScalarMethod` on the power manager with the selector
 `kPMSetClamshellSleepState` from `IOPMLibDefs.h`. The selector has no
-documentation. If macOS refuses the call, Caffeinate shows an alert and
-turns the option off.
+documentation. If macOS refuses to set the override, Caffeinate shows
+an alert and turns the option off. If macOS refuses to clear it,
+Caffeinate shows an alert and tries again on the next change.
 
 ### Auto-off timer
 
